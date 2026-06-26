@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> EthioAgriSight | AI-Powered Agricultural Intelligence</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Google Earth Engine API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@google/earthengine@0.1.373/build/ee_api_js.js"></script>
+
+    <!-- Google Fonts: Poppins and Lato -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Lato', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        h1, h2, h3 {
+            font-family: 'Poppins', sans-serif;
+        }
+        #app-container {
+            display: flex;
+            height: 100vh;
+        }
+        #map-container {
+            flex-grow: 1;
+            position: relative;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        #control-panel {
+            width: 350px;
+            flex-shrink: 0;
+            background-color: white;
+            padding: 1.5rem;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .leaflet-control-layers-toggle {
+            background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgdmlld0JveD0iMCAwIDI0IDIIVIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAwMDAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWdvbiBwb2ludHM9IjEyIDIgMiAxMiAxMiAyMiAyMiAxMiAxMiAyIj48L3BvbHlnb24+PHBvbHlnb24gcG9ibnRzPSIxMiAxNiAyIDEyIDEyIDgiPjwvcG9seWdvbj48L3N2Zz4=);
+            width: 36px;
+            height: 36px;
+        }
+        .legend {
+            padding: 6px 10px;
+            font: 14px/16px 'Lato', sans-serif;
+            background: white;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .legend h4 {
+            margin: 0 0 5px;
+            font-weight: bold;
+            font-family: 'Poppins', sans-serif;
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.8;
+        }
+        .bar-chart-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            height: 120px;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .bar-group {
+            width: 40%;
+            text-align: center;
+        }
+        .bar {
+            background-color: #3b82f6;
+            transition: height 0.5s ease-in-out;
+            border-radius: 4px 4px 0 0;
+            position: relative;
+        }
+        .bar-label {
+            font-size: 12px;
+            color: #475569;
+            margin-top: 4px;
+        }
+        .bar-value {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        .cta-button {
+            transition: all 0.3s ease;
+            background-image: linear-gradient(to right, #3b82f6, #2563eb);
+        }
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px -5px rgb(59 130 246 / 0.5);
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="app-container">
+        <!-- Control Panel -->
+        <aside id="control-panel">
+            <h2 class="text-2xl font-bold mb-1">EthioAgriSight | Demo</h2>
+            <p class="text-slate-600 mb-6">AI-Powered Agricultural Intelligence</p>
+            <div class="bg-slate-50 p-4 rounded-lg border">
+                    <h3 class="font-bold text-slate-800 mb-2 text-sm">Project Objectives</h3>
+                    <ul class="text-xs text-slate-600 list-disc pl-4 space-y-1">
+                        <li>Real-time environmental monitoring.</li>
+                        <li>AI-driven agricultural decision support.</li>
+                        <li>Democratizing geospatial data access.</li>
+                    </ul>
+                </div>
+
+            <div class="space-y-6">
+                <!-- Data Source Toggle -->
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-2">Data Source</label>
+                    <div class="flex flex-col space-y-2 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="datasource" value="simulated" class="form-radio text-blue-600" checked>
+                            <span class="text-sm text-slate-700 font-medium">Simulated (Preview Mode)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="datasource" value="gee" class="form-radio text-blue-600">
+                            <span class="text-sm text-slate-700 font-medium">Live Google Earth Engine</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="month-select" class="block font-semibold text-slate-700 mb-2">Select Month</label>
+                    <select id="month-select" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="june">June 2025</option>
+                        <option value="july">July 2025</option>
+                        <option value="august">August 2025</option>
+                    </select>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-slate-700 mb-2">Monthly Averages</h3>
+                    <div class="bar-chart-container">
+                        <div class="bar-group">
+                            <div id="ndvi-bar" class="bar mx-auto" style="height: 50%; background-color: #22c55e;">
+                                <span id="ndvi-bar-value" class="bar-value">0.50</span>
+                            </div>
+                            <div class="bar-label">NDVI</div>
+                        </div>
+                        <div class="bar-group">
+                            <div id="rainfall-bar" class="bar mx-auto" style="height: 30%; background-color: #3b82f6;">
+                                <span id="rainfall-bar-value" class="bar-value">0.30</span>
+                            </div>
+                            <div class="bar-label">Rainfall</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-200">
+                    <h3 class="font-semibold text-slate-700 mb-2">AI-Powered Summary</h3>
+                    <button id="generate-analysis-btn" class="w-full text-white font-semibold py-2.5 px-4 rounded-lg text-base cta-button flex items-center justify-center">
+                        <span class="mr-2">✨</span> Generate Monthly Analysis
+                    </button>
+                    <!-- Add this near your "Select Month" dropdown -->
+<div>
+    <label for="language-select" class="block font-semibold text-slate-700 mb-2">Interface Language</label>
+    <select id="language-select" class="w-full p-3 border border-slate-300 rounded-lg">
+        <option value="English">English</option>
+        <option value="Amharic">Amharic (አማርኛ)</option>
+        <option value="Afan Oromo">Afan Oromo</option>
+        <option value="Tigrinya">Tigrinya (ትግርኛ)</option>
+        <option value="Somali">Somali (Af-Soomaali)</option>
+        <option value="Afar">Afar (Qafaraf)</option>
+    </select>
+</div>
+                    <div id="analysis-container" class="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-600 min-h-[100px]">
+                        Click the button to generate an AI-powered summary of the selected month's data.
+                    </div>
+                </div>
+                
+                <div class="pt-4 border-t border-slate-200">
+                     <h3 class="font-semibold text-slate-700 mb-2">About This Demo</h3>
+                     <p class="text-sm text-slate-500">This dashboard features a dual-mode architecture. You can toggle between fast, simulated data for previews, and the live Google Earth Engine backend for production-level satellite imagery analysis.</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main id="map-container">
+            <div id="map"></div>
+        </main>
+    </div>
+
+    <!-- Leaflet JS for Interactive Map -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+            const mapEl = document.getElementById('map');
+            if (!mapEl || typeof L === 'undefined') {
+                console.error("Map element not found or Leaflet library is not loaded.");
+                return;
+            }
+
+            // --- Basemap Definitions ---
+            const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+            });
+            const lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+            });
+            const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri'
+            });
+
+            // --- Google Earth Engine Configuration ---
+            // To run the GEE mode on your own server, you must provide your Google Cloud OAuth Client ID here.
+            // Your GCP project must have the Earth Engine API enabled.
+            const GEE_CLIENT_ID = ""; // e.g., "1234567890-abcdefg.apps.googleusercontent.com"
+
+            // --- Map Initialization ---
+            const map = L.map('map', {
+                center: [9.1450, 40.4897],
+                zoom: 6,
+                layers: [darkMap] // Set default basemap
+            });
+
+            // --- Data Simulation ---
+            const bounds = L.latLngBounds([3.39, 32.99], [14.89, 48.00]); // Ethiopia bounds
+            const simulatedData = {};
+            const months = ['june', 'july', 'august'];
+
+            const generateMonthlyData = (monthIndex) => {
+                const ndviFeatures = [];
+                const rainfallFeatures = [];
+                let ndviTotal = 0, rainfallTotal = 0, rainfallCount = 0;
+                const gridSize = 0.5;
+
+                for (let lat = bounds.getSouth(); lat < bounds.getNorth(); lat += gridSize) {
+                    for (let lng = bounds.getWest(); lng < bounds.getEast(); lng += gridSize) {
+                        const cellBounds = [[lat, lng], [lat + gridSize, lng + gridSize]];
+                        
+                        const baseNdvi = (lat > 8 && lat < 12) ? 0.4 : 0.2;
+                        const ndviValue = Math.min(0.9, baseNdvi + (monthIndex * 0.15) + (Math.random() * 0.2));
+                        ndviTotal += ndviValue;
+                        ndviFeatures.push({
+                            type: "Feature",
+                            properties: { value: ndviValue },
+                            geometry: L.rectangle(cellBounds).toGeoJSON().geometry
+                        });
+
+                        if (Math.random() > 0.5) {
+                            const baseRainfall = (lng < 40) ? 0.5 : 0.2;
+                            const rainfallValue = Math.min(1.0, baseRainfall + (monthIndex * 0.1) + (Math.random() * 0.3));
+                            rainfallTotal += rainfallValue;
+                            rainfallCount++;
+                            rainfallFeatures.push({
+                                type: "Feature",
+                                properties: { value: rainfallValue },
+                                geometry: { type: "Point", coordinates: [lng + gridSize/2, lat + gridSize/2] }
+                            });
+                        }
+                    }
+                }
+                const avgNdvi = ndviTotal / ndviFeatures.length;
+                const avgRainfall = rainfallCount > 0 ? rainfallTotal / rainfallCount : 0;
+
+                return { 
+                    ndvi: { type: "FeatureCollection", features: ndviFeatures }, 
+                    rainfall: { type: "FeatureCollection", features: rainfallFeatures },
+                    averages: { ndvi: avgNdvi, rainfall: avgRainfall }
+                };
+            };
+
+            months.forEach((month, index) => {
+                simulatedData[month] = generateMonthlyData(index);
+            });
+
+            // --- Layer Styling & Interaction ---
+            const getNdviColor = (d) => d > 0.8 ? '#00441b' : d > 0.6 ? '#238b45' : d > 0.4 ? '#66c2a4' : d > 0.2 ? '#b2e2e2' : '#edf8fb';
+            const ndviStyle = (feature) => ({ fillColor: getNdviColor(feature.properties.value), weight: 0, opacity: 1, fillOpacity: 0.7 });
+            const rainfallPointToLayer = (feature, latlng) => L.circleMarker(latlng, { radius: feature.properties.value * 10 + 3, fillColor: "#2563eb", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.6 });
+
+            const onEachNdviFeature = (feature, layer) => {
+                layer.on({
+                    mouseover: (e) => L.popup().setLatLng(e.latlng).setContent(`NDVI: ${feature.properties.value.toFixed(2)}`).openOn(map),
+                    mouseout: () => map.closePopup()
+                });
+            };
+            const onEachRainfallFeature = (feature, layer) => {
+                layer.on({
+                    mouseover: (e) => L.popup().setLatLng(e.latlng).setContent(`Rainfall Index: ${feature.properties.value.toFixed(2)}`).openOn(map),
+                    mouseout: () => map.closePopup()
+                });
+            };
+
+            // --- Legends ---
+            const createLegend = (grades, colorFunc, title) => {
+                const legend = L.control({position: 'bottomright'});
+                legend.onAdd = function (map) {
+                    const div = L.DomUtil.create('div', 'info legend');
+                    div.innerHTML += `<h4>${title}</h4>`;
+                    for (let i = 0; i < grades.length; i++) {
+                        div.innerHTML += `<i style="background:${colorFunc(grades[i] + 0.1)}"></i>${grades[i]}${(grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+')}`;
+                    }
+                    return div;
+                };
+                return legend;
+            };
+            const ndviLegend = createLegend([0.0, 0.2, 0.4, 0.6, 0.8], getNdviColor, "Vegetation (NDVI)");
+
+            // --- Initialize Layers and Layer Control ---
+            let ndviLayer = L.geoJSON(null, { style: ndviStyle, onEachFeature: onEachNdviFeature });
+            let rainfallLayer = L.geoJSON(null, { pointToLayer: rainfallPointToLayer, onEachFeature: onEachRainfallFeature });
+
+            const baseMaps = { "Dark": darkMap, "Light": lightMap, "Satellite": satelliteMap };
+            const overlayMaps = { "Vegetation Health (NDVI)": ndviLayer, "Rainfall Intensity": rainfallLayer };
+            L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+            // Layers specifically for GEE Map Tiles
+            let geeNdviLayer = null;
+            let geeRainfallLayer = null;
+
+            // --- Control Panel & Graph Logic ---
+            const monthSelect = document.getElementById('month-select');
+            const ndviBar = document.getElementById('ndvi-bar');
+            const rainfallBar = document.getElementById('rainfall-bar');
+            const ndviBarValue = document.getElementById('ndvi-bar-value');
+            const rainfallBarValue = document.getElementById('rainfall-bar-value');
+            const generateAnalysisBtn = document.getElementById('generate-analysis-btn');
+            const analysisContainer = document.getElementById('analysis-container');
+            const dataSourceRadios = document.getElementsByName('datasource');
+
+            function updateDashboard() {
+                const selectedMonth = monthSelect.value;
+                const dataSource = Array.from(dataSourceRadios).find(radio => radio.checked).value;
+
+                if (dataSource === 'simulated') {
+                    // Remove GEE layers if they exist
+                    if (geeNdviLayer) map.removeLayer(geeNdviLayer);
+                    if (geeRainfallLayer) map.removeLayer(geeRainfallLayer);
+                    
+                    const monthData = simulatedData[selectedMonth];
+
+                    // Update map layers
+                    ndviLayer.clearLayers().addData(monthData.ndvi);
+                    rainfallLayer.clearLayers().addData(monthData.rainfall);
+                    if (!map.hasLayer(ndviLayer)) ndviLayer.addTo(map);
+                    if (!map.hasLayer(rainfallLayer)) rainfallLayer.addTo(map);
+
+                    // Update graph
+                    const avgNdvi = monthData.averages.ndvi;
+                    const avgRainfall = monthData.averages.rainfall;
+                    
+                    ndviBar.style.height = `${avgNdvi * 100}%`;
+                    ndviBarValue.textContent = avgNdvi.toFixed(2);
+                    rainfallBar.style.height = `${avgRainfall * 100}%`;
+                    rainfallBarValue.textContent = avgRainfall.toFixed(2);
+                } else if (dataSource === 'gee') {
+                    // Hide simulated layers
+                    ndviLayer.clearLayers();
+                    rainfallLayer.clearLayers();
+                    
+                    if (!GEE_CLIENT_ID) {
+                        alert("Google Earth Engine Client ID is missing. Please add your OAuth Client ID in the code to fetch live satellite data. Falling back to simulated data.");
+                        document.querySelector('input[value="simulated"]').checked = true;
+                        updateDashboard();
+                        return;
+                    }
+                    
+                    // Trigger GEE Initialization & Data Load
+                    initializeAndLoadGEE(selectedMonth);
+                }
+                
+                // Reset AI analysis text
+                analysisContainer.innerHTML = 'Click the button to generate an AI-powered summary of the selected month\'s data.';
+            }
+
+            // --- Real Google Earth Engine Logic ---
+            function initializeAndLoadGEE(selectedMonth) {
+                // Determine Month Index and Year (using 2023 to ensure data availability)
+                const monthMap = { 'june': 6, 'july': 7, 'august': 8 };
+                const year = 2023; 
+                const monthNum = monthMap[selectedMonth];
+
+                // Authenticate and Initialize
+                ee.data.authenticateViaOauth(GEE_CLIENT_ID, () => {
+                    ee.initialize(null, null, () => {
+                        fetchGEELayers(year, monthNum);
+                    }, (e) => {
+                        console.error('GEE Initialization Error:', e);
+                        alert("Earth Engine failed to initialize. Check console for details.");
+                    });
+                }, (e) => {
+                    console.error('GEE Auth Error:', e);
+                    alert("Earth Engine authentication failed. Make sure your Client ID is correct and authorized.");
+                });
+            }
+
+            function fetchGEELayers(year, monthNum) {
+                // Define Time Range
+                const startDate = ee.Date.fromYMD(year, monthNum, 1);
+                const endDate = startDate.advance(1, 'month');
+
+                // Region of Interest: Ethiopia
+                const ethiopia = ee.FeatureCollection("FAO/GAUL/2015/level0")
+                                   .filter(ee.Filter.eq('ADM0_NAME', 'Ethiopia'));
+
+                // 1. Process Real NDVI (Using MODIS)
+                const modisDataset = ee.ImageCollection('MODIS/061/MOD13A2')
+                    .filterDate(startDate, endDate)
+                    .select('NDVI')
+                    .mean()
+                    .clip(ethiopia);
+                
+                // Scale MODIS NDVI (scale factor is 0.0001)
+                const ndviScaled = modisDataset.multiply(0.0001);
+                const ndviVis = {
+                    min: 0.0,
+                    max: 0.8,
+                    palette: ['FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901', '66A000', '529400', '3E8601', '207401', '056201']
+                };
+
+                // Add to map
+                ndviScaled.getMap(ndviVis, (mapId) => {
+                    const tileUrl = `https://earthengine.googleapis.com/map/${mapId.mapid}/{z}/{x}/{y}?token=${mapId.token}`;
+                    if (geeNdviLayer) map.removeLayer(geeNdviLayer);
+                    geeNdviLayer = L.tileLayer(tileUrl, { attribution: 'Map Data &copy; Google Earth Engine' }).addTo(map);
+                });
+
+                // 2. Process Real Rainfall (Using CHIRPS Precipitation Data)
+                const chirpsDataset = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')
+                    .filterDate(startDate, endDate)
+                    .sum() // Total rainfall for the month
+                    .clip(ethiopia);
+
+                const rainfallVis = {
+                    min: 0,
+                    max: 300, // max mm for visual contrast
+                    palette: ['#ffffff', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#0c2c84']
+                };
+
+                chirpsDataset.getMap(rainfallVis, (mapId) => {
+                    const tileUrl = `https://earthengine.googleapis.com/map/${mapId.mapid}/{z}/{x}/{y}?token=${mapId.token}`;
+                    if (geeRainfallLayer) map.removeLayer(geeRainfallLayer);
+                    geeRainfallLayer = L.tileLayer(tileUrl, { opacity: 0.7, attribution: 'Map Data &copy; Google Earth Engine' }).addTo(map);
+                });
+
+                // 3. Calculate Real Regional Averages for the UI Graph
+                const meanDictionary = ndviScaled.addBands(chirpsDataset.rename('Rainfall')).reduceRegion({
+                    reducer: ee.Reducer.mean(),
+                    geometry: ethiopia.geometry(),
+                    scale: 5000, // 5km resolution for fast stats
+                    maxPixels: 1e9
+                });
+
+                meanDictionary.evaluate((result) => {
+                    if (result) {
+                        // Update UI graph with real satellite derived metrics
+                        const realNdvi = result.NDVI || 0;
+                        const realRainfall = result.Rainfall || 0;
+                        
+                        ndviBar.style.height = `${Math.min(100, realNdvi * 100)}%`;
+                        ndviBarValue.textContent = realNdvi.toFixed(2);
+                        
+                        // Scale rainfall to fit the visual bar graph (assuming ~300mm is 100%)
+                        rainfallBar.style.height = `${Math.min(100, (realRainfall / 300) * 100)}%`;
+                        rainfallBarValue.textContent = realRainfall.toFixed(0) + "mm";
+                    }
+                });
+            }
+
+            // --- Gemini API Integration ---
+            async function callGemini(prompt) {
+                let apiKey = "";
+                if (!apiKey) {
+                    apiKey = "";
+                }
+                
+                // We target the mandated gemini-2.5-flash-preview-09-2025 model in this preview environment
+                const model = "gemini-3.1-pro-preview-06-2026";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                
+                const payload = { 
+                    contents: [{ 
+                        parts: [{ text: prompt }] 
+                    }] 
+                };
+                
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        const errorMsg = errorData?.error?.message || response.statusText || `HTTP status ${response.status}`;
+                        throw new Error(errorMsg);
+                    }
+                    
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    return `Sorry, an error occurred during analysis: ${error.message}`;
+                }
+            }
+            
+            generateAnalysisBtn.addEventListener('click', async () => {
+                analysisContainer.innerHTML = 'Generating analysis...';
+                const selectedMonth = monthSelect.value;
+                const monthName = monthSelect.options[monthSelect.selectedIndex].text;
+                
+                // Get current values from the UI graph (works for both simulated and GEE modes)
+                const currentNdvi = document.getElementById('ndvi-bar-value').textContent;
+                const currentRainfall = document.getElementById('rainfall-bar-value').textContent;
+
+                const prompt = `
+                    You are a geospatial analyst for an environmental agency in Ethiopia. 
+                    For the month of ${monthName}, the calculated country-wide NDVI (vegetation health index) is ${currentNdvi} and the rainfall metric is ${currentRainfall}. 
+                    Based on this being part of the Kiremt rainy season, provide a brief, one-paragraph summary of the environmental conditions. 
+                    Mention potential implications for agriculture and water resources.
+                `;
+
+                const analysis = await callGemini(prompt);
+                analysisContainer.innerHTML = analysis.replace(/\n/g, '<br>');
+            });
+
+
+            // --- Event Listeners ---
+            monthSelect.addEventListener('change', updateDashboard);
+            Array.from(dataSourceRadios).forEach(radio => radio.addEventListener('change', updateDashboard));
+            
+            map.on('overlayadd', (e) => { if (e.layer === ndviLayer) ndviLegend.addTo(map); });
+            map.on('overlayremove', (e) => { if (e.layer === ndviLayer) map.removeControl(ndviLegend); });
+
+            // --- Initial Load ---
+            updateDashboard();
+            ndviLayer.addTo(map);
+            rainfallLayer.addTo(map);
+            ndviLegend.addTo(map);
+        });
+    </script>
+</body>
+</html>
